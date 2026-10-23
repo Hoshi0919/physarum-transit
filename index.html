@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Physarum Transit · 黏菌自适应网络与拟态物流模拟器</title>
+  <style>
+    :root {
+      --bg: #06080d;
+      --panel-bg: rgba(13, 19, 32, 0.85);
+      --panel-border: rgba(56, 189, 248, 0.2);
+      --text-main: #f1f5f9;
+      --text-dim: #94a3b8;
+      --slime-green: #39ff14;
+      --slime-core: #22c55e;
+      --cyan-glow: #00f5ff;
+      --amber-food: #f59e0b;
+      --crimson-sever: #ef4444;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+
+    #canvas-container {
+      flex: 1;
+      height: 100vh;
+      position: relative;
+      cursor: crosshair;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 顶部控制栏 */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 360px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 18px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--slime-green) 0%, #15803d 70%, transparent 100%);
+      box-shadow: 0 0 14px var(--slime-green);
+      animation: pulse-glow 2.5s infinite alternate ease-in-out;
+    }
+
+    @keyframes pulse-glow {
+      0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 8px var(--slime-green); }
+      100% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 20px var(--slime-green); }
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--slime-green);
+      font-family: monospace;
+    }
+
+    .tool-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.7);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .btn.active {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: var(--slime-green);
+      color: var(--slime-green);
+      box-shadow: 0 0 12px rgba(57, 255, 20, 0.25);
+    }
+
+    .btn-danger {
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+    .btn-danger:hover, .btn-danger.active {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--crimson-sever);
+      color: var(--crimson-sever);
+    }
+
+    .badge {
+      background: rgba(0, 0, 0, 0.35);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-family: monospace;
+      color: var(--text-dim);
+    }
+
+    /* 右侧侧边栏 */
+    .sidebar {
+      width: 340px;
+      height: 100vh;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border-left: 1px solid var(--panel-border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      z-index: 10;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .stat-label {
+      color: var(--text-dim);
+    }
+
+    .stat-val {
+      font-family: monospace;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .stat-val.accent {
+      color: var(--slime-green);
+    }
+
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .scenario-btn {
+      padding: 8px 10px;
+      font-size: 12px;
+      text-align: left;
+      line-height: 1.3;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--slime-green);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--slime-green);
+    }
+
+    /* 浮动 HUD 提示 */
+    .hud-banner {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(13, 19, 32, 0.85);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .hud-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-source { background: var(--amber-food); box-shadow: 0 0 6px var(--amber-food); }
+    .dot-sink { background: var(--cyan-glow); box-shadow: 0 0 6px var(--cyan-glow); }
+    .dot-vein { background: var(--slime-green); box-shadow: 0 0 6px var(--slime-green); }
+
+    /* 快捷键提示条 */
+    .hotkey-list {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .hotkey-list span {
+      color: #fff;
+      font-family: monospace;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container">
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-icon"></div>
+        <div>
+          <div class="brand-title">Physarum Transit · 黏菌自组织网络</div>
+          <div class="brand-sub">POISEUILLE ADAPTIVE FLUX DYNAMICS (Tero et al. 2010)</div>
+        </div>
+      </div>
+
+      <div class="tool-group">
+        <button class="btn active" id="tool-inspect" onclick="setTool('inspect')">
+          <span>🔍 检视/移位</span> <span class="badge">[1]</span>
+        </button>
+        <button class="btn" id="tool-food" onclick="setTool('food')">
+          <span>🌱 投喂建站</span> <span class="badge">[2]</span>
+        </button>
+        <button class="btn btn-danger" id="tool-scalpel" onclick="setTool('scalpel')">
+          <span>✂️ 断管手术刀</span> <span class="badge">[3]</span>
+        </button>
+        <button class="btn" id="btn-stress" onclick="triggerSurge()">
+          <span>⚡ 洪峰应力测试</span> <span class="badge">[4]</span>
+        </button>
+        <button class="btn" id="btn-pause" onclick="togglePause()">
+          <span id="pause-text">⏸️ 暂停</span> <span class="badge">[Space]</span>
+        </button>
+      </div>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <div class="hud-banner">
+      <div class="hud-chip"><div class="dot dot-source"></div> 生产源 (Source)</div>
+      <div class="hud-chip"><div class="dot dot-sink"></div> 消耗汇 (Sink)</div>
+      <div class="hud-chip"><div class="dot dot-vein"></div> 黏菌管网 (Vein)</div>
+      <div style="margin-left: 12px; color: #fff;" id="status-line">系统稳态运转中 · 原浆往复脉动</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <!-- 拓扑演化情景预设 -->
+    <div class="card">
+      <div class="card-title">
+        <span>经典动力学情景</span>
+        <span class="badge">SCENARIOS</span>
+      </div>
+      <div class="scenario-grid">
+        <button class="btn scenario-btn" onclick="loadScenario('tokyo')">
+          <b>🇯🇵 东京城铁</b><br><small style="color:var(--text-dim)">山手线环状自涌</small>
+        </button>
+        <button class="btn scenario-btn" onclick="loadScenario('labyrinth')">
+          <b>🧭 迷宫寻优</b><br><small style="color:var(--text-dim)">死胡同管线凋亡</small>
+        </button>
+        <button class="btn scenario-btn" onclick="loadScenario('braess')">
+          <b>⚖️ 布雷斯悖论</b><br><small style="color:var(--text-dim)">捷径自平衡消解</small>
+        </button>
+        <button class="btn scenario-btn" onclick="loadScenario('factory')">
+          <b>🏭 工场自愈环</b><br><small style="color:var(--text-dim)">断管0闭锁重路由</small>
+        </button>
+      </div>
+      <button class="btn" style="width: 100%; margin-top: 8px; justify-content: center;" onclick="loadScenario('sandbox')">
+        🧪 清空为自由培养皿
+      </button>
+    </div>
+
+    <!-- 实时生化与网络指标 -->
+    <div class="card">
+      <div class="card-title">
+        <span>拓扑物理遥测</span>
+        <span class="badge">TELEMETRY</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">活跃管道 / 萎缩微细管</span>
+        <span class="stat-val"><span id="val-active-tubes" class="accent">0</span> / <span id="val-atrophied-tubes">0</span></span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">全网总导通通量</span>
+        <span class="stat-val" id="val-total-flux">0.00 L/s</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">网络能量耗散率 (Murray能耗)</span>
+        <span class="stat-val" id="val-energy-loss">0.00 W</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">双连通鲁棒性指数</span>
+        <span class="stat-val accent" id="val-robustness">100%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">原浆脉动相位周期</span>
+        <span class="stat-val" id="val-pulse-phase">0.0 rad</span>
+      </div>
+    </div>
+
+    <!-- 动力学生物物理参数调节 -->
+    <div class="card">
+      <div class="card-title">
+        <span>动力学生物物理调谐</span>
+        <span class="badge">PARAMETERS</span>
+      </div>
+      
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>非线性增益幂次 (γ / Gamma)</span>
+          <span id="label-gamma">1.30</span>
+        </div>
+        <input type="range" id="param-gamma" min="1.0" max="2.0" step="0.05" value="1.30" oninput="updateParams()">
+        <small style="color:var(--text-dim); font-size:10px;">γ=1.0保持冗余环状网；γ>1.5强力修剪为树状主干</small>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>管道自然萎缩率 (μ / Decay)</span>
+          <span id="label-decay">0.25</span>
+        </div>
+        <input type="range" id="param-decay" min="0.05" max="0.5" step="0.01" value="0.25" oninput="updateParams()">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>原浆流动演化步长 (dt)</span>
+          <span id="label-dt">0.10</span>
+        </div>
+        <input type="range" id="param-dt" min="0.02" max="0.30" step="0.02" value="0.10" oninput="updateParams()">
+      </div>
+    </div>
+
+    <!-- 生物声学合成与快捷键 -->
+    <div class="card">
+      <div class="card-title">
+        <span>原生 Web Audio 动态声学</span>
+        <span class="badge">AUDIO</span>
+      </div>
+      <button class="btn" id="btn-audio" style="width: 100%; justify-content: center;" onclick="toggleAudio()">
+        🔊 开启生物原浆回响音效
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>操控指南</span>
+        <span class="badge">KEYS</span>
+      </div>
+      <div class="hotkey-list">
+        <div><span>1</span> 检视 / 鼠标拖拽节点形变网络</div>
+        <div><span>2</span> 投喂新食物点 / 扩展候选毛细管</div>
+        <div><span>3</span> 手术刀 / 单击精准切断动脉</div>
+        <div><span>4</span> 触发洪峰冲激压力测试</div>
+        <div><span>Space</span> 暂停 / 继续动力学演化</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 纯前端自适应黏菌动力学求解器 (Physarum Core) ---
+    class Node {
+      constructor(id, x, y, injection = 0, label = "", kind = "relay") {
+        this.id = id;
+        this.x = x;
+        this.y = y;
+        this.injection = injection;
+        this.label = label || id;
+        this.kind = kind; // 'source', 'sink', 'relay', 'hub'
+        this.pressure = 0.0;
+        this.radius = 8;
+      }
+    }
+
+    class Edge {
+      constructor(u, v, length, conductivity = 1.0) {
+        this.u = u;
+        this.v = v;
+        this.key = u < v ? `${u}--${v}` : `${v}--${u}`;
+        this.length = Math.max(1, length);
+        this.conductivity = Math.max(0.005, Math.min(10.0, conductivity));
+        this.flux = 0.0;
+        this.active = true;
+        this.d_min = 0.005;
+        this.d_max = 10.0;
+      }
+    }
+
+    class Particle {
+      constructor(edge) {
+        this.edge = edge;
+        this.progress = Math.random();
+        this.speed = (Math.random() * 0.5 + 0.5);
+      }
+    }
+
+    // 全局状态
+    const state = {
+      nodes: new Map(),
+      edges: new Map(),
+      adj: new Map(),
+      particles: [],
+      currentTool: 'inspect',
+      paused: false,
+      selectedNode: null,
+      draggedNode: null,
+      audioEnabled: false,
+      audioCtx: null,
+      droneOsc: null,
+      droneGain: null,
+      pulsePhase: 0.0,
+      stepCount: 0,
+      params: {
+        gamma: 1.30,
+        decay: 0.25,
+        dt: 0.10,
+        alpha: 0.15
+      }
+    };
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const container = document.getElementById('canvas-container');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = container.clientWidth * dpr;
+      canvas.height = container.clientHeight * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 辅助构网方法
+    function addNode(id, x, y, injection = 0, label = "", kind = "relay") {
+      const node = new Node(id, x, y, injection, label, kind);
+      state.nodes.set(id, node);
+      if (!state.adj.has(id)) state.adj.set(id, new Set());
+      return node;
+    }
+
+    function addEdge(u, v, conductivity = 1.0, length = null) {
+      if (!state.nodes.has(u) || !state.nodes.has(v) || u === v) return null;
+      const n1 = state.nodes.get(u);
+      const n2 = state.nodes.get(v);
+      const dist = length || Math.hypot(n1.x - n2.x, n1.y - n2.y);
+      const edge = new Edge(u, v, dist, conductivity);
+      state.edges.set(edge.key, edge);
+      state.adj.get(u).add(v);
+      state.adj.get(v).add(u);
+
+      // 生成粒子
+      for (let i = 0; i < 4; i++) {
+        state.particles.push(new Particle(edge));
+      }
+      return edge;
+    }
+
+    function severEdge(u, v) {
+      const key = u < v ? `${u}--${v}` : `${v}--${u}`;
+      const edge = state.edges.get(key);
+      if (edge && edge.active) {
+        edge.active = false;
+        edge.conductivity = edge.d_min;
+        edge.flux = 0.0;
+        playSeverSound();
+        updateStatus(`✂️ 已精准切断管道 [${key}]！网络正在进行自愈重路由...`, '#ef4444');
+        return true;
+      }
+      return false;
+    }
+
+    // 物理求解：超松弛迭代泊松压力
+    function solvePressures() {
+      if (state.nodes.size === 0) return;
+      const nodeKeys = Array.from(state.nodes.keys());
+      let anchorId = nodeKeys[0];
+      for (const [id, n] of state.nodes.entries()) {
+        if (n.injection < 0) { anchorId = id; break; }
+      }
+
+      let totalInj = 0;
+      for (const n of state.nodes.values()) totalInj += n.injection;
+      const injCorrection = totalInj / state.nodes.size;
+
+      const omega = 1.35;
+      for (let it = 0; it < 35; it++) {
+        let maxDiff = 0.0;
+        for (const nid of nodeKeys) {
+          if (nid === anchorId) {
+            state.nodes.get(nid).pressure = 0.0;
+            continue;
+          }
+          const node = state.nodes.get(nid);
+          let sumCond = 0.0;
+          let sumFlow = 0.0;
+          const neighbors = state.adj.get(nid);
+          if (neighbors) {
+            for (const nbr of neighbors) {
+              const k = nid < nbr ? `${nid}--${nbr}` : `${nbr}--${nid}`;
+              const e = state.edges.get(k);
+              if (e && e.active) {
+                const cond = e.conductivity / e.length;
+                sumCond += cond;
+                sumFlow += cond * state.nodes.get(nbr).pressure;
+              }
+            }
+          }
+          if (sumCond > 1e-7) {
+            const effInj = node.injection - injCorrection;
+            const targetP = (effInj + sumFlow) / sumCond;
+            const newP = (1.0 - omega) * node.pressure + omega * targetP;
+            const diff = Math.abs(newP - node.pressure);
+            if (diff > maxDiff) maxDiff = diff;
+            node.pressure = newP;
+          }
+        }
+        if (maxDiff < 1e-4) break;
+      }
+
+      // 计算通量
+      for (const e of state.edges.values()) {
+        if (!e.active) { e.flux = 0; continue; }
+        const pu = state.nodes.get(e.u).pressure;
+        const pv = state.nodes.get(e.v).pressure;
+        e.flux = (e.conductivity / e.length) * (pu - pv);
+      }
+    }
+
+    // 管径自适应演化
+    function stepAdaptation() {
+      solvePressures();
+      const dt = state.params.dt;
+      const alpha = state.params.alpha;
+      const gamma = state.params.gamma;
+      const decay = state.params.decay;
+
+      for (const e of state.edges.values()) {
+        if (!e.active) continue;
+        const absQ = Math.abs(e.flux);
+        const growth = alpha * Math.pow(absQ, gamma);
+        const shrink = decay * e.conductivity;
+        const dD = (growth - shrink) * dt;
+        e.conductivity = Math.max(e.d_min, Math.min(e.d_max, e.conductivity + dD));
+      }
+      state.stepCount++;
+      state.pulsePhase += 0.05;
+      if (state.pulsePhase > Math.PI * 2) state.pulsePhase -= Math.PI * 2;
+    }
+
+    // --- 经典情景预设加载 ---
+    function loadScenario(type) {
+      state.nodes.clear();
+      state.edges.clear();
+      state.adj.clear();
+      state.particles = [];
+      state.stepCount = 0;
+
+      const container = document.getElementById('canvas-container');
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      const cx = w / 2;
+      const cy = h / 2;
+
+      if (type === 'tokyo') {
+        addNode("Tokyo", cx, cy, 32.0, "东京枢纽 (Tokyo)", "hub");
+        const sat = [
+          ["Yokohama", cx - 40, cy + 140, -5.0, "横滨"],
+          ["Kawasaki", cx - 20, cy + 70, -3.0, "川崎"],
+          ["Chiba", cx + 150, cy + 10, -4.0, "千叶"],
+          ["Funabashi", cx + 80, cy - 40, -3.0, "船桥"],
+          ["Matsudo", cx + 60, cy - 100, -3.0, "松户"],
+          ["Saitama", cx - 30, cy - 130, -5.0, "埼玉"],
+          ["Kawagoe", cx - 110, cy - 140, -2.0, "川越"],
+          ["Tokorozawa", cx - 100, cy - 70, -2.0, "所泽"],
+          ["Hachioji", cx - 160, cy + 20, -3.0, "八王子"],
+          ["Machida", cx - 100, cy + 80, -3.0, "町田"]
+        ];
+        sat.forEach(([id, x, y, inj, lbl]) => addNode(id, x, y, inj, lbl, "sink"));
+
+        // 放射线
+        sat.forEach(([id]) => addEdge("Tokyo", id, 0.6));
+        // 外围环状相连
+        for (let i = 0; i < sat.length; i++) {
+          addEdge(sat[i][0], sat[(i + 1) % sat.length][0], 0.35);
+        }
+        // 关键联络线
+        addEdge("Kawasaki", "Machida", 0.25);
+        addEdge("Saitama", "Funabashi", 0.25);
+        addEdge("Tokorozawa", "Saitama", 0.25);
+        updateStatus("已载入【东京城铁自涌】经典情景：观察山手线闭环与放射主干如何在 10 秒内涌现！", "#38bdf8");
+      } 
+      else if (type === 'braess') {
+        addNode("S", cx - 220, cy, 14.0, "起点 S", "source");
+        addNode("A", cx - 20, cy - 120, 0.0, "中继站 A", "relay");
+        addNode("B", cx - 20, cy + 120, 0.0, "中继站 B", "relay");
+        addNode("T", cx + 180, cy, -14.0, "终点 T", "sink");
+
+        addEdge("S", "A", 1.2);
+        addEdge("S", "B", 1.2);
+        addEdge("A", "T", 1.2);
+        addEdge("B", "T", 1.2);
+        addEdge("A", "B", 0.02); // 极小捷径
+        updateStatus("已载入【布雷斯悖论消解】情景：A-B 捷径初始仅有微小毛细管，观察自组织网络如何抑制恶性捷径！", "#38bdf8");
+      }
+      else if (type === 'factory') {
+        addNode("Ore", cx - 240, cy, 20.0, "矿物总进料", "source");
+        addNode("Smelt", cx - 80, cy - 130, 0.0, "高炉冶炼", "relay");
+        addNode("Fab", cx + 100, cy - 130, 0.0, "晶片制造", "relay");
+        addNode("Power", cx - 80, cy + 130, 0.0, "裂变电网", "relay");
+        addNode("Assem", cx + 100, cy + 130, 0.0, "精密装配", "relay");
+        addNode("Silo", cx + 240, cy, -20.0, "发射井交付", "sink");
+
+        addEdge("Ore", "Smelt", 1.5);
+        addEdge("Ore", "Power", 1.5);
+        addEdge("Smelt", "Fab", 1.5);
+        addEdge("Power", "Assem", 1.5);
+        addEdge("Fab", "Silo", 1.5);
+        addEdge("Assem", "Silo", 1.5);
+        // 冗余备用
+        addEdge("Smelt", "Assem", 0.3);
+        addEdge("Power", "Fab", 0.3);
+        addEdge("Ore", "Silo", 0.08);
+        updateStatus("已载入【工场自愈物流环】：尝试使用剪刀 [3] 切断 Smelt--Fab 动脉，观察备用环路瞬间自愈接管！", "#38bdf8");
+      }
+      else if (type === 'labyrinth') {
+        addNode("Entry", cx - 240, cy - 100, 16.0, "入口 Entry", "source");
+        addNode("Exit", cx + 240, cy + 100, -16.0, "出口 Exit", "sink");
+
+        // 迷宫节点网格
+        const pts = [
+          ["M1", cx - 120, cy - 100],
+          ["M2", cx, cy - 100],
+          ["Dead1", cx, cy - 180],
+          ["M3", cx, cy],
+          ["Dead2", cx - 120, cy],
+          ["Dead3", cx + 120, cy - 100],
+          ["M4", cx, cy + 100],
+          ["M5", cx + 120, cy + 100],
+          ["Dead4", cx + 120, cy + 180]
+        ];
+        pts.forEach(([id, x, y]) => addNode(id, x, y, 0.0, id, "relay"));
+
+        addEdge("Entry", "M1", 1.0);
+        addEdge("M1", "M2", 1.0);
+        addEdge("M2", "Dead1", 1.0);
+        addEdge("M2", "M3", 1.0);
+        addEdge("M3", "Dead2", 1.0);
+        addEdge("M2", "Dead3", 1.0);
+        addEdge("M3", "M4", 1.0);
+        addEdge("M4", "Dead4", 1.0);
+        addEdge("M4", "M5", 1.0);
+        addEdge("M5", "Exit", 1.0);
+        addEdge("Entry", "Dead2", 0.8);
+        updateStatus("已载入【迷宫拓扑寻优】：死胡同分支将由于无回路净通量而完全萎缩消失！", "#38bdf8");
+      }
+      else if (type === 'sandbox') {
+        addNode("S1", cx - 150, cy, 10.0, "始发站 A", "source");
+        addNode("T1", cx + 150, cy, -10.0, "交付点 B", "sink");
+        addEdge("S1", "T1", 0.8);
+        updateStatus("已重置为空白培养皿。按 [2] 单击画布任意位置添加营养源与站点！", "#39ff14");
+      }
+    }
+
+    // --- 交互工具管理 ---
+    function setTool(tool) {
+      state.currentTool = tool;
+      document.querySelectorAll('.tool-group .btn').forEach(b => {
+        if (b.id.startsWith('tool-')) b.classList.remove('active');
+      });
+      const el = document.getElementById(`tool-${tool}`);
+      if (el) el.classList.add('active');
+
+      const toolNames = {
+        'inspect': '检视与拓扑移位模式：拖拽节点可重塑空间路网',
+        'food': '投喂建站模式：单击画布直接播种新站点，自动接入临近网络',
+        'scalpel': '手术刀切断模式：单击任意管道将其精准切断以测试自愈能力'
+      };
+      updateStatus(toolNames[tool] || '就绪', '#38bdf8');
+    }
+
+    function togglePause() {
+      state.paused = !state.paused;
+      document.getElementById('pause-text').innerText = state.paused ? '▶️ 继续' : '⏸️ 暂停';
+      updateStatus(state.paused ? '⏸️ 模拟已暂停' : '▶️ 动力学持续演化中', state.paused ? '#f59e0b' : '#39ff14');
+    }
+
+    function triggerSurge() {
+      for (const n of state.nodes.values()) {
+        if (n.injection > 0) n.injection *= 2.5;
+        if (n.injection < 0) n.injection *= 2.5;
+      }
+      playSurgeSound();
+      updateStatus('⚡ 洪峰脉冲注入！通量激增 250%，观察管道动态膨胀！', '#f59e0b');
+      setTimeout(() => {
+        for (const n of state.nodes.values()) {
+          if (n.injection > 0) n.injection /= 2.5;
+          if (n.injection < 0) n.injection /= 2.5;
+        }
+      }, 4000);
+    }
+
+    function updateParams() {
+      state.params.gamma = parseFloat(document.getElementById('param-gamma').value);
+      state.params.decay = parseFloat(document.getElementById('param-decay').value);
+      state.params.dt = parseFloat(document.getElementById('param-dt').value);
+
+      document.getElementById('label-gamma').innerText = state.params.gamma.toFixed(2);
+      document.getElementById('label-decay').innerText = state.params.decay.toFixed(2);
+      document.getElementById('label-dt').innerText = state.params.dt.toFixed(2);
+    }
+
+    function updateStatus(text, color = '#38bdf8') {
+      const line = document.getElementById('status-line');
+      if (line) {
+        line.innerText = text;
+        line.style.color = color;
+      }
+    }
+
+    // --- Web Audio 生物原浆声学引擎 ---
+    function toggleAudio() {
+      if (!state.audioCtx) {
+        state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 低频持续原浆脉动
+        state.droneOsc = state.audioCtx.createOscillator();
+        state.droneGain = state.audioCtx.createGain();
+        state.droneOsc.type = 'sine';
+        state.droneOsc.frequency.setValueAtTime(55, state.audioCtx.currentTime); // 55Hz Sub-bass
+        state.droneGain.gain.setValueAtTime(0.04, state.audioCtx.currentTime);
+
+        state.droneOsc.connect(state.droneGain);
+        state.droneGain.connect(state.audioCtx.destination);
+        state.droneOsc.start();
+
+        state.audioEnabled = true;
+        document.getElementById('btn-audio').innerText = '🔊 生物声学回响已启动';
+        document.getElementById('btn-audio').classList.add('active');
+      } else {
+        if (state.audioCtx.state === 'suspended') {
+          state.audioCtx.resume();
+          state.audioEnabled = true;
+          document.getElementById('btn-audio').innerText = '🔊 生物声学回响已启动';
+        } else {
+          state.audioCtx.suspend();
+          state.audioEnabled = false;
+          document.getElementById('btn-audio').innerText = '🔈 声音已静音';
+          document.getElementById('btn-audio').classList.remove('active');
+        }
+      }
+    }
+
+    function playSeverSound() {
+      if (!state.audioEnabled || !state.audioCtx) return;
+      const osc = state.audioCtx.createOscillator();
+      const gain = state.audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, state.audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(60, state.audioCtx.currentTime + 0.18);
+      gain.gain.setValueAtTime(0.12, state.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, state.audioCtx.currentTime + 0.18);
+      osc.connect(gain);
+      gain.connect(state.audioCtx.destination);
+      osc.start();
+      osc.stop(state.audioCtx.currentTime + 0.2);
+    }
+
+    function playSurgeSound() {
+      if (!state.audioEnabled || !state.audioCtx) return;
+      const osc = state.audioCtx.createOscillator();
+      const gain = state.audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(110, state.audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(240, state.audioCtx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.1, state.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, state.audioCtx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(state.audioCtx.destination);
+      osc.start();
+      osc.stop(state.audioCtx.currentTime + 0.42);
+    }
+
+    // --- 鼠标交互事件监听 ---
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      // 检查点击节点
+      let clickedNode = null;
+      for (const node of state.nodes.values()) {
+        if (Math.hypot(node.x - mx, node.y - my) <= node.radius + 6) {
+          clickedNode = node;
+          break;
+        }
+      }
+
+      if (state.currentTool === 'inspect') {
+        if (clickedNode) {
+          state.draggedNode = clickedNode;
+          state.selectedNode = clickedNode;
+          updateStatus(`选中节点 [${clickedNode.label}] (压力: ${clickedNode.pressure.toFixed(2)}, 通量注入: ${clickedNode.injection})`, '#38bdf8');
+        } else {
+          state.selectedNode = null;
+        }
+      } 
+      else if (state.currentTool === 'food') {
+        // 在此处创建新节点，并就近连接最近的 2~3 个节点
+        const id = "N" + (state.nodes.size + 1);
+        const newNode = addNode(id, mx, my, 0.0, "站点 " + id, "relay");
+        
+        // 查找最近的节点连线
+        const distList = [];
+        for (const [nid, n] of state.nodes.entries()) {
+          if (nid === id) continue;
+          distList.push({ id: nid, dist: Math.hypot(n.x - mx, n.y - my) });
+        }
+        distList.sort((a, b) => a.dist - b.dist);
+        const connectCount = Math.min(3, distList.length);
+        for (let i = 0; i < connectCount; i++) {
+          addEdge(id, distList[i].id, 0.5);
+        }
+        updateStatus(`🌱 已播种站点 [${newNode.label}]，并接入 ${connectCount} 根候选管道！`, '#39ff14');
+      }
+      else if (state.currentTool === 'scalpel') {
+        // 查找点击的边缘
+        let clickedEdge = null;
+        let minDist = 12;
+        for (const edge of state.edges.values()) {
+          if (!edge.active) continue;
+          const u = state.nodes.get(edge.u);
+          const v = state.nodes.get(edge.v);
+          if (!u || !v) continue;
+          // 点到线段距离
+          const d = distToSegment(mx, my, u.x, u.y, v.x, v.y);
+          if (d < minDist) {
+            minDist = d;
+            clickedEdge = edge;
+          }
+        }
+        if (clickedEdge) {
+          severEdge(clickedEdge.u, clickedEdge.v);
+        }
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.draggedNode) {
+        const rect = canvas.getBoundingClientRect();
+        state.draggedNode.x = e.clientX - rect.left;
+        state.draggedNode.y = e.clientY - rect.top;
+        // 重新更新连接边的长度
+        for (const edge of state.edges.values()) {
+          if (edge.u === state.draggedNode.id || edge.v === state.draggedNode.id) {
+            const u = state.nodes.get(edge.u);
+            const v = state.nodes.get(edge.v);
+            edge.length = Math.max(1, Math.hypot(u.x - v.x, u.y - v.y));
+          }
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.draggedNode = null;
+    });
+
+    // 快捷键监听
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') setTool('inspect');
+      if (e.key === '2') setTool('food');
+      if (e.key === '3') setTool('scalpel');
+      if (e.key === '4') triggerSurge();
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePause();
+      }
+    });
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const l2 = (x2 - x1)**2 + (y2 - y1)**2;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    }
+
+    // --- 渲染循环 ---
+    function render() {
+      if (!state.paused) {
+        stepAdaptation();
+      }
+
+      const w = canvas.width / (window.devicePixelRatio || 1);
+      const h = canvas.height / (window.devicePixelRatio || 1);
+
+      // 清屏与深空网格
+      ctx.fillStyle = '#06080d';
+      ctx.fillRect(0, 0, w, h);
+
+      // 绘制微弱背景网格
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      for (let x = 0; x < w; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      // 1. 绘制管道 (Veins)
+      let activeCount = 0;
+      let atrophiedCount = 0;
+      let totalFlux = 0;
+      let totalDissipation = 0;
+
+      const pulseWave = Math.sin(state.pulsePhase) * 0.15 + 1.0;
+
+      for (const edge of state.edges.values()) {
+        const u = state.nodes.get(edge.u);
+        const v = state.nodes.get(edge.v);
+        if (!u || !v) continue;
+
+        const isDormant = !edge.active || edge.conductivity <= edge.d_min * 1.5;
+        if (isDormant) {
+          atrophiedCount++;
+        } else {
+          activeCount++;
+          totalFlux += Math.abs(edge.flux);
+          totalDissipation += (edge.length / edge.conductivity) * (edge.flux ** 2);
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(u.x, u.y);
+        ctx.lineTo(v.x, v.y);
+
+        if (!edge.active) {
+          // 断开的管道：红色虚线
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.25)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else if (isDormant) {
+          // 萎缩管道：极淡毛细线条
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else {
+          // 活跃粗壮管道：生物荧光绿与脉动光晕
+          const thickness = Math.sqrt(edge.conductivity) * 3.5 * pulseWave;
+          
+          // 外发光
+          ctx.shadowBlur = Math.min(18, edge.conductivity * 4);
+          ctx.shadowColor = '#39ff14';
+          ctx.strokeStyle = `rgba(57, 255, 20, ${Math.min(0.9, 0.25 + edge.conductivity * 0.15)})`;
+          ctx.lineWidth = thickness;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+
+          // 核心白色高光
+          if (edge.conductivity > 2.0) {
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = Math.max(1, thickness * 0.35);
+            ctx.stroke();
+          }
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      // 2. 绘制原浆流动粒子
+      if (!state.paused) {
+        for (const p of state.particles) {
+          const e = p.edge;
+          if (!e.active || e.conductivity <= e.d_min * 1.5) continue;
+          const u = state.nodes.get(e.u);
+          const v = state.nodes.get(e.v);
+          if (!u || !v) continue;
+
+          // 根据流向与通量速度推进
+          const flowSpeed = (e.flux / Math.max(0.1, e.conductivity)) * 0.008;
+          p.progress += flowSpeed * p.speed;
+          if (p.progress > 1.0) p.progress -= 1.0;
+          if (p.progress < 0.0) p.progress += 1.0;
+
+          const px = u.x + (v.x - u.x) * p.progress;
+          const py = u.y + (v.y - u.y) * p.progress;
+
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#00f5ff';
+          ctx.beginPath();
+          ctx.arc(px, py, Math.min(3, 1.2 + e.conductivity * 0.3), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      // 3. 绘制节点 (Nodes)
+      for (const node of state.nodes.values()) {
+        ctx.save();
+        ctx.translate(node.x, node.y);
+
+        // 外部光晕与压力环
+        const pNormalized = Math.max(0, Math.min(1, Math.abs(node.pressure) / 50.0));
+        ctx.beginPath();
+        ctx.arc(0, 0, node.radius + 6 + pNormalized * 8, 0, Math.PI * 2);
+        if (node.kind === 'source') {
+          ctx.strokeStyle = `rgba(245, 158, 11, ${0.3 + pNormalized * 0.5})`;
+        } else if (node.kind === 'sink') {
+          ctx.strokeStyle = `rgba(0, 245, 255, ${0.3 + pNormalized * 0.5})`;
+        } else {
+          ctx.strokeStyle = `rgba(57, 255, 20, ${0.2 + pNormalized * 0.4})`;
+        }
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 核心实心球
+        ctx.beginPath();
+        ctx.arc(0, 0, node.radius, 0, Math.PI * 2);
+        if (node.kind === 'source') {
+          ctx.fillStyle = '#f59e0b';
+          ctx.shadowColor = '#f59e0b';
+        } else if (node.kind === 'sink') {
+          ctx.fillStyle = '#00f5ff';
+          ctx.shadowColor = '#00f5ff';
+        } else if (node.kind === 'hub') {
+          ctx.fillStyle = '#ec4899';
+          ctx.shadowColor = '#ec4899';
+        } else {
+          ctx.fillStyle = '#22c55e';
+          ctx.shadowColor = '#22c55e';
+        }
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 绘制标签文本
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.label, 0, -node.radius - 8);
+
+        ctx.restore();
+      }
+
+      // 更新仪表盘遥测数值
+      document.getElementById('val-active-tubes').innerText = activeCount;
+      document.getElementById('val-atrophied-tubes').innerText = atrophiedCount;
+      document.getElementById('val-total-flux').innerText = totalFlux.toFixed(2) + ' L/s';
+      document.getElementById('val-energy-loss').innerText = totalDissipation.toFixed(1) + ' W';
+      const rob = state.nodes.size > 0 ? (activeCount / state.nodes.size * 100).toFixed(0) : 100;
+      document.getElementById('val-robustness').innerText = rob + '%';
+      document.getElementById('val-pulse-phase').innerText = state.pulsePhase.toFixed(2) + ' rad';
+
+      // 调整声学引擎基频
+      if (state.audioEnabled && state.droneOsc) {
+        const baseFreq = 50 + Math.min(120, totalFlux * 2.0);
+        state.droneOsc.frequency.setTargetAtTime(baseFreq, state.audioCtx.currentTime, 0.1);
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // 默认加载东京铁道经典情景
+    loadScenario('tokyo');
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
